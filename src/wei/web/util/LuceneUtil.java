@@ -40,9 +40,7 @@ import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.Directory;
-import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.MMapDirectory;
-import org.apache.lucene.store.NIOFSDirectory;
 import org.apache.lucene.store.RAMDirectory;
 import org.apache.lucene.util.Version;
 
@@ -162,7 +160,7 @@ public class LuceneUtil {
 		}
 	}
 
-	public void search(String querystr) {
+	public static void search(String querystr) {
 		try {
 			ramReader = DirectoryReader.open(ramDir);
 			searcher = new IndexSearcher(ramReader);
@@ -182,13 +180,12 @@ public class LuceneUtil {
 			TopDocs results = searcher.search(mquery, 5, Sort.RELEVANCE);
 			ScoreDoc[] hits = results.scoreDocs;
 			int numTotalHits = results.totalHits;
-			System.out.println(numTotalHits + " total matching documents." + ramReader.maxDoc());
+			System.out.println("hit:"+numTotalHits+" time:" + (System.currentTimeMillis() - start));
 			int i = 0;
 			for (ScoreDoc d : hits) {
-
 				Document doc = searcher.doc(d.doc);
-				System.out.println(i++ + "docID:" + d.doc + "id:" + doc.get("id") + ";content:"
-						+ doc.get("content").replaceAll(regBuilder.toString(), "<red>$1</red>"));
+				System.out.println(i++ + "docID:" + d.doc + "id:" + doc.get("id"));
+				System.out.println("content:" + doc.get("content").replaceAll(regBuilder.toString(), "<red>$1</red>"));
 			}
 			System.out.println("search time:" + (System.currentTimeMillis() - start));
 
