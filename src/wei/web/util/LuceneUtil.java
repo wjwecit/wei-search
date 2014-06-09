@@ -48,7 +48,7 @@ import org.apache.lucene.store.NIOFSDirectory;
 import org.apache.lucene.store.RAMDirectory;
 import org.apache.lucene.util.Version;
 
-import wei.db.common.DBManager;
+import wei.db.common.DBConnectionManager;
 
 import com.chenlb.mmseg4j.analysis.SimpleAnalyzer;
 
@@ -58,7 +58,7 @@ import com.chenlb.mmseg4j.analysis.SimpleAnalyzer;
  */
 public class LuceneUtil {
 
-	private DBManager dbm = new DBManager();
+	private DBConnectionManager dbm = new DBConnectionManager();
 
 	private static String mainIndexPath = getRootPath() + "/IndexMain";
 	private static String dayIndexPath = getRootPath() + "/IndexDay/"

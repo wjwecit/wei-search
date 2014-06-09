@@ -14,7 +14,6 @@ import javax.servlet.http.HttpServletResponse;
 import wei.db.common.DbTemplate;
 import wei.db.common.Session;
 import wei.db.common.TransactionExecutor;
-import wei.web.mvc.model.AreaChina;
 import wei.web.util.RequestUtils;
 
 import com.google.gson.Gson;
