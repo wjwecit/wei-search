@@ -10,9 +10,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.Random;
 
 import org.apache.lucene.analysis.Analyzer;
@@ -61,12 +59,9 @@ public class LuceneUtil {
 	private DBConnectionManager dbm = new DBConnectionManager();
 
 	private static String mainIndexPath = getRootPath() + "/IndexMain";
-	private static String dayIndexPath = getRootPath() + "/IndexDay/"
-			+ new SimpleDateFormat("yyyyMMdd").format(new Date());
-
-	private static IndexWriter dayIndexWriter;
 	private static IndexWriter mainIndexWriter;
 	private static IndexWriter ramIndexWriter;
+	private static Directory mainDir;
 
 	public static Analyzer analyzer = new SimpleAnalyzer();
 
@@ -82,20 +77,19 @@ public class LuceneUtil {
 	static {
 
 		try {
-			mainIndexWriter = getIndexWriter(mainIndexPath, false);
+			File indexPath = new File(mainIndexPath);
+			if (!indexPath.exists()) {
+				indexPath.mkdirs();
+			}
+			mainDir = MMapDirectory.open(indexPath);
+			mainIndexWriter = new IndexWriter(mainDir, getIndexWriterConfig(false));
 			mainIndexWriter.commit();
-
-			dayIndexWriter = getIndexWriter(dayIndexPath, false);
-			dayIndexWriter.commit();
+			mainReader = DirectoryReader.open(mainDir);
 
 			ramDir = new RAMDirectory();
-			ramIndexWriter = new IndexWriter(ramDir, new IndexWriterConfig(Version.LUCENE_48, analyzer));
+			ramIndexWriter = new IndexWriter(ramDir, getIndexWriterConfig(true));
 			ramIndexWriter.commit();
-
-			mainReader = DirectoryReader.open(MMapDirectory.open(new File(mainIndexPath)));
-			DirectoryReader.open(MMapDirectory.open(new File(dayIndexPath)));
 			ramReader = DirectoryReader.open(ramDir);
-
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -105,9 +99,7 @@ public class LuceneUtil {
 	 * @param args
 	 */
 	public static void main(String[] args) {
-		// analy("北京");
 		String str = "现在要把baidu着色，也就是要把baidu替换成<font style='color:red'>baidu</a>因为html标签如a,img等里面的内容是不能替换的，所以这就要用到PHP的正则环视结构了。分析：正文baidu中，左边是不存在但存在<...>，同理，右边不存在但存在\\<....\\>于是，解决方案如下事实上“定向降准”<a 并非央行新采用的货币政策工>具</a>。几年前部分县域法人金融机构就已获准可定向降准，即执行低于同类金融机构１个百分点上缴准备金率的政策优惠。央行与银监会曾制定“鼓励县域法人金融机构将新增存款一定比例用于当地贷款”的考核办法，根据这一考核办法，对于达标的县域法人金融机构，存款准备金率按低于同类金融机构正常标准１个百分点执行，这一考核办法凸显出央行“定向降准”的正向激励原则。";
-
 		str = "关于促进南部地区现在要把baidu着色，也就是要把baidu替换成";
 		LuceneUtil lu = new LuceneUtil();
 
@@ -144,15 +136,11 @@ public class LuceneUtil {
 			if (!indexDir.exists()) {
 				indexDir.mkdirs();
 			}
-			Directory dir = FSDirectory.open(indexDir);
-
 			IndexWriterConfig iwc = new IndexWriterConfig(Version.LUCENE_48, analyzer);
 
 			iwc.setOpenMode(OpenMode.CREATE);
 			iwc.setRAMBufferSizeMB(256.0);
 
-			IndexWriter writer = new IndexWriter(dir, iwc);
-
 			while (rs.next()) {
 				Document doc = new Document();
 				IntField f1 = new IntField("id", Integer.parseInt(rs.getObject("id").toString()), Store.YES);
@@ -161,89 +149,17 @@ public class LuceneUtil {
 				doc.add(f1);
 				doc.add(f2);
 				doc.add(f3);
-				writer.addDocument(doc);
+				ramIndexWriter.addDocument(doc);
 			}
-			writer.commit();
-			writer.close();
-			System.out.println(System.currentTimeMillis() - start);
-		} catch (SQLException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
-
-	public void index(IndexWriter writer) {
-		Connection conn = dbm.getConnection();
-		try {
-			long start = System.currentTimeMillis();
-			Statement st = conn.createStatement();
-			st.setFetchSize(Integer.MIN_VALUE);
-			ResultSet rs = st.executeQuery("select * from docs where id<20000");
-			while (rs.next()) {
-				Document doc = new Document();
-				IntField f1 = new IntField("id", Integer.parseInt(rs.getObject("id").toString()), Store.YES);
-				StringField f2 = new StringField("name", rs.getObject("name").toString(), Store.YES);
-				TextField f3 = new TextField("content", rs.getObject("content").toString(), Store.YES);
-				doc.add(f1);
-				doc.add(f2);
-				doc.add(f3);
-				writer.addDocument(doc);
-			}
-			writer.commit();
-			System.out.println(System.currentTimeMillis() - start);
-		} catch (SQLException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
-
-	public static void addDoc(Document doc) {
-		try {
-			// dayIndexWriter.addDocument(doc);
-			// dayIndexWriter.commit();
-			ramIndexWriter.addDocument(doc);
 			ramIndexWriter.commit();
-
+			System.out.println(System.currentTimeMillis() - start);
 			ramReader = DirectoryReader.open(ramDir);
-			reader = new MultiReader(mainReader, ramReader);
-			int max = reader.maxDoc();
-			System.out.println(max);
-			searcher = new IndexSearcher(reader);
+			reader = new MultiReader(ramReader, mainReader);
+		} catch (SQLException e) {
+			e.printStackTrace();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-	}
-
-	public static void addDoc() {
-		Document doc = new Document();
-		IntField f1 = new IntField("id", new Random().nextInt(), Store.YES);
-		StringField f2 = new StringField("name", new Random().nextInt() + "石", Store.YES);
-		TextField f3 = new TextField("content", new Random().nextInt() + "石", Store.YES);
-		doc.add(f1);
-		doc.add(f2);
-		doc.add(f3);
-		addDoc(doc);
-	}
-
-	private static IndexWriter getIndexWriter(String path, boolean replaceOld) {
-		File dir = new File(path);
-		if (!dir.exists()) {
-			dir.mkdirs();
-		}
-		try {
-			IndexWriterConfig config = new IndexWriterConfig(Version.LUCENE_48, analyzer);
-			config.setMaxBufferedDocs(5000);
-			config.setOpenMode(replaceOld ? OpenMode.CREATE : OpenMode.CREATE_OR_APPEND);
-			config.setRAMBufferSizeMB(256.0);
-			config.setUseCompoundFile(false);
-			IndexWriter writer = new IndexWriter(NIOFSDirectory.open(dir), config);
-			return writer;
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return null;
 	}
 
 	public void search(String querystr) {
@@ -273,7 +189,6 @@ public class LuceneUtil {
 				Document doc = searcher.doc(d.doc);
 				System.out.println(i++ + "docID:" + d.doc + "id:" + doc.get("id") + ";content:"
 						+ doc.get("content").replaceAll(regBuilder.toString(), "<red>$1</red>"));
-				// analyze(analyzer, x);
 			}
 			System.out.println("search time:" + (System.currentTimeMillis() - start));
 
@@ -284,7 +199,45 @@ public class LuceneUtil {
 		}
 	}
 
-	protected static ArrayList<String>getFenci(String text) {
+	public static void addDoc(Document doc) {
+		try {
+			ramIndexWriter.addDocument(doc);
+			ramIndexWriter.commit();
+
+			ramReader = DirectoryReader.open(ramDir);
+			reader = new MultiReader(mainReader, ramReader);
+			searcher = new IndexSearcher(reader);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public static void addDoc() {
+		Document doc = new Document();
+		IntField f1 = new IntField("id", new Random().nextInt(), Store.YES);
+		StringField f2 = new StringField("name", new Random().nextInt() + "石", Store.YES);
+		TextField f3 = new TextField("content", new Random().nextInt() + "石", Store.YES);
+		doc.add(f1);
+		doc.add(f2);
+		doc.add(f3);
+		addDoc(doc);
+	}
+
+	private static IndexWriterConfig getIndexWriterConfig(boolean replaceOld) {
+		try {
+			IndexWriterConfig config = new IndexWriterConfig(Version.LUCENE_48, analyzer);
+			config.setMaxBufferedDocs(5000);
+			config.setOpenMode(replaceOld ? OpenMode.CREATE : OpenMode.CREATE_OR_APPEND);
+			config.setRAMBufferSizeMB(256.0);
+			config.setUseCompoundFile(false);
+			return config;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+
+	protected static ArrayList<String> getFenci(String text) {
 		ArrayList<String> res = new ArrayList<String>();
 		try {
 			TokenStream tokenStrm = analyzer.tokenStream("content", new StringReader(text));
@@ -312,20 +265,6 @@ public class LuceneUtil {
 			e.printStackTrace();
 		}
 		return res;
-	}
-
-	public static void analyze(Analyzer analyzer, String text) throws Exception {
-		TokenStream tokens = analyzer.tokenStream("content", new StringReader(text));
-		tokens.reset();
-		OffsetAttribute offsetAttr = tokens.getAttribute(OffsetAttribute.class);
-		CharTermAttribute charTermAttr = tokens.getAttribute(CharTermAttribute.class);
-		while (tokens.incrementToken()) {
-			char[] charBuf = charTermAttr.buffer();
-			String term = new String(charBuf, 0, offsetAttr.endOffset() - offsetAttr.startOffset());
-			// System.out.println("("+term + ")|" + offsetAttr.startOffset() + ", " + offsetAttr.endOffset());
-			System.out.print("(" + term + ")|");
-		}
-		tokens.close();
 	}
 
 	public static String getRootPath() {
