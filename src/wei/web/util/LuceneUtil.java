@@ -99,23 +99,21 @@ public class LuceneUtil {
 	public static void main(String[] args) {
 		String str = "现在要把baidu着色，也就是要把baidu替换成<font style='color:red'>baidu</a>因为html标签如a,img等里面的内容是不能替换的，所以这就要用到PHP的正则环视结构了。分析：正文baidu中，左边是不存在但存在<...>，同理，右边不存在但存在\\<....\\>于是，解决方案如下事实上“定向降准”<a 并非央行新采用的货币政策工>具</a>。几年前部分县域法人金融机构就已获准可定向降准，即执行低于同类金融机构１个百分点上缴准备金率的政策优惠。央行与银监会曾制定“鼓励县域法人金融机构将新增存款一定比例用于当地贷款”的考核办法，根据这一考核办法，对于达标的县域法人金融机构，存款准备金率按低于同类金融机构正常标准１个百分点执行，这一考核办法凸显出央行“定向降准”的正向激励原则。";
 		str = "关于促进南部地区现在要把baidu着色，也就是要把baidu替换成";
-		LuceneUtil lu = new LuceneUtil();
-
 		try {
 
 			for (int i = 0; i < 10; i++) {
 				Document doc = new Document();
 				IntField f1 = new IntField("id", i, Store.YES);
 				StringField f2 = new StringField("name", new Random().nextInt() + "石", Store.YES);
-				TextField f3 = new TextField("content", i + str, Store.YES);
+				TextField f3 = new TextField("content", i +":"+ str, Store.YES);
 				doc.add(f1);
 				doc.add(f2);
 				doc.add(f3);
 				ramIndexWriter.addDocument(doc);
 			}
 			ramIndexWriter.commit();
-			str = "baidu关于也就是";
-			lu.search(str);
+			str = "现在要把baidu关于也就是";
+			search(str);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -184,7 +182,7 @@ public class LuceneUtil {
 			int i = 0;
 			for (ScoreDoc d : hits) {
 				Document doc = searcher.doc(d.doc);
-				System.out.println(i++ + "docID:" + d.doc + "id:" + doc.get("id"));
+				System.out.println(i++ + ":docID:" + d.doc + "id:" + doc.get("id"));
 				System.out.println("content:" + doc.get("content").replaceAll(regBuilder.toString(), "<red>$1</red>"));
 			}
 			System.out.println("search time:" + (System.currentTimeMillis() - start));
