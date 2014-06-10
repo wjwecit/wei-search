@@ -12,6 +12,8 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Random;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
@@ -43,9 +45,11 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.MMapDirectory;
 import org.apache.lucene.store.RAMDirectory;
 import org.apache.lucene.util.Version;
+import org.wltea.analyzer.lucene.IKAnalyzer;
 
 import wei.db.common.DBConnectionManager;
 
+import com.chenlb.mmseg4j.analysis.ComplexAnalyzer;
 import com.chenlb.mmseg4j.analysis.SimpleAnalyzer;
 
 /**
@@ -61,7 +65,7 @@ public class LuceneUtil {
 	private static IndexWriter ramIndexWriter;
 	private static Directory mainDir;
 
-	public static Analyzer analyzer = new SimpleAnalyzer();
+	public static Analyzer analyzer = new IKAnalyzer();
 
 	private static IndexReader mainReader = null;
 	private static IndexReader ramReader = null;
@@ -105,14 +109,14 @@ public class LuceneUtil {
 				Document doc = new Document();
 				IntField f1 = new IntField("id", i, Store.YES);
 				StringField f2 = new StringField("name", new Random().nextInt() + "石", Store.YES);
-				TextField f3 = new TextField("content", i +":"+ str, Store.YES);
+				TextField f3 = new TextField("content", i + ":三元齐次线性方程组" + str, Store.YES);
 				doc.add(f1);
 				doc.add(f2);
 				doc.add(f3);
 				ramIndexWriter.addDocument(doc);
 			}
 			ramIndexWriter.commit();
-			str = "现在要把baidu关于也就是";
+			str = "线性方程组关于促进地区现在要把baidu着色";
 			search(str);
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -175,15 +179,17 @@ public class LuceneUtil {
 			regBuilder.subSequence(0, regBuilder.length() - 1);
 			regBuilder.replace(regBuilder.length() - 1, regBuilder.length(), ")(?![^<]*>)");
 
+			System.out.println(regBuilder);
 			TopDocs results = searcher.search(mquery, 5, Sort.RELEVANCE);
 			ScoreDoc[] hits = results.scoreDocs;
 			int numTotalHits = results.totalHits;
-			System.out.println("hit:"+numTotalHits+" time:" + (System.currentTimeMillis() - start));
+			System.out.println("hit:" + numTotalHits + " time:" + (System.currentTimeMillis() - start));
 			int i = 0;
+			Pattern p = Pattern.compile(regBuilder.toString(), Pattern.CASE_INSENSITIVE);
 			for (ScoreDoc d : hits) {
 				Document doc = searcher.doc(d.doc);
 				System.out.println(i++ + ":docID:" + d.doc + "id:" + doc.get("id"));
-				System.out.println("content:" + doc.get("content").replaceAll(regBuilder.toString(), "<red>$1</red>"));
+				System.out.println("content:" + regHighlight(p, doc.get("content")));
 			}
 			System.out.println("search time:" + (System.currentTimeMillis() - start));
 
@@ -264,6 +270,9 @@ public class LuceneUtil {
 
 	public static String getRootPath() {
 		String classPath = Thread.currentThread().getContextClassLoader().getResource("").getPath();
+		if (classPath.indexOf("/WEB-INF/classes") == -1) {
+			throw new IllegalAccessError("please check your build path, WEB-INF/classes needed!");
+		}
 		String rootPath = "";
 		// windows下
 		if ("\\".equals(File.separator)) {
@@ -276,6 +285,42 @@ public class LuceneUtil {
 			rootPath = rootPath.replace("\\", "/");
 		}
 		return rootPath;
+	}
+
+	// 正则去除标签外正文中匹配关键字方法
+	public static String regHighlight(Pattern p, String text) {
+		Matcher m = p.matcher(text);
+		if (m.find()) {
+			return m.replaceAll("<span class=\"msg\">$1</span>");
+		}
+		return text;
+	}
+
+	/**
+	 * 处理img标签中alt属性内包含大于号小于号问题
+	 */
+	public static String escapeImgAltTag(String text) {
+		char[] chs = text.toCharArray();
+		StringBuilder sb = new StringBuilder();
+		int start = text.indexOf("alt=\"");
+		if (start == -1) {
+			return text;
+		}
+		sb.append(text.subSequence(0, start + 5));
+		for (int i = start + 5; i < chs.length; i++) {
+			char c = chs[i];
+			if (c == '<') {
+				sb.append("〈");
+			} else if (c == '>') {
+				sb.append("〉");
+			} else if (c == '"') {
+				sb.append(escapeImgAltTag(text.substring(i)));
+				break;
+			} else {
+				sb.append(c);
+			}
+		}
+		return sb.toString();
 	}
 
 	public static void add(int id) {
